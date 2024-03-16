@@ -24,6 +24,14 @@ torch.set_float32_matmul_precision("high")
 from AR.utils import get_newest_ckpt
 
 from collections import OrderedDict
+from time import time as ttime
+import shutil
+def my_save(fea,path):#####fix issue: torch.save doesn't support chinese path
+    dir=os.path.dirname(path)
+    name=os.path.basename(path)
+    tmp_path="%s.pth"%(ttime())
+    torch.save(fea,tmp_path)
+    shutil.move(tmp_path,"%s/%s"%(dir,name))
 
 
 class my_model_ckpt(ModelCheckpoint):
@@ -70,7 +78,8 @@ class my_model_ckpt(ModelCheckpoint):
                         to_save_od["weight"][key] = dictt[key].half()
                     to_save_od["config"] = self.config
                     to_save_od["info"] = "GPT-e%s" % (trainer.current_epoch + 1)
-                    torch.save(
+                    # torch.save(
+                    my_save(
                         to_save_od,
                         "%s/%s-e%s.ckpt"
                         % (
@@ -109,16 +118,16 @@ def main(args):
     os.environ["MASTER_ADDR"]="localhost"
     trainer: Trainer = Trainer(
         max_epochs=config["train"]["epochs"],
-        accelerator="gpu",
+        accelerator="gpu" if torch.cuda.is_available() else "cpu",
         # val_check_interval=9999999999999999999999,###不要验证
         # check_val_every_n_epoch=None,
         limit_val_batches=0,
-        devices=-1,
+        devices=-1 if torch.cuda.is_available() else 1,
         benchmark=False,
         fast_dev_run=False,
-        strategy = "auto" if torch.backends.mps.is_available() else DDPStrategy(
+        strategy = DDPStrategy(
             process_group_backend="nccl" if platform.system() != "Windows" else "gloo"
-        ),  # mps 不支持多节点训练
+        ) if torch.cuda.is_available() else "auto",
         precision=config["train"]["precision"],
         logger=logger,
         num_sanity_val_steps=0,
