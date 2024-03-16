@@ -371,7 +371,15 @@ def get_tts_wav(ref_wav_path, prompt_text, prompt_language, text, text_language,
     if not ref_free:
         phones1,bert1,norm_text1=get_phones_and_bert(prompt_text, prompt_language)
 
+    #zyc 生成一个用于存放音频的文件夹
+    import time
+    import soundfile as sf
     for text in texts:
+        #--------- zyc 生成一个用于存放音频的文件夹
+        current_time = time.now()
+        temp_audio_path = f'/kaggle/working/GPT-SoVITS/TEMP_AUDIO/{current_time}'
+        os.makedirs(temp_audio_path, exist_ok=True)
+        #--------- zyc 生成一个用于存放音频的文件夹
         # 解决输入目标文本的空行导致报错的问题
         if (len(text.strip()) == 0):
             continue
@@ -414,16 +422,35 @@ def get_tts_wav(ref_wav_path, prompt_text, prompt_language, text, text_language,
         else:
             refer = refer.to(device)
         # audio = vq_model.decode(pred_semantic, all_phoneme_ids, refer).detach().cpu().numpy()[0, 0]
-        audio = (
-            vq_model.decode(
-                pred_semantic, torch.LongTensor(phones2).to(device).unsqueeze(0), refer
-            )
+        # -------zyc对以下代码进行修改，尝试多次，取最小值，这会成本增加音频的处理时间。
+        shortest_audio = None
+        shortest_duration = float('inf')
+
+        for _ in range(3):  # 生成3个音频
+            audio = (
+                vq_model.decode(
+                    pred_semantic, torch.LongTensor(phones2).to(device).unsqueeze(0), refer
+                )
                 .detach()
                 .cpu()
                 .numpy()[0, 0]
-        )  ###试试重建不带上prompt部分
-        max_audio=np.abs(audio).max()#简单防止16bit爆音
-        if max_audio>1:audio/=max_audio
+            )  ###试试重建不带上prompt部分
+            # -------zyc音频文件，根据当前时间写入临时目录。
+            max_audio = np.abs(audio).max()  # 简单防止16bit爆音
+            if max_audio > 1: audio /= max_audio
+            current_time = time.now()
+            audio_path = os.path.join(temp_audio_path, f"{current_time}.wav")
+            sf.write(audio_path, audio, 32000)
+            # -------zyc
+            # 加载音频文件
+            audio, sr = librosa.load(audio, sr=None)
+            audio_duration = len(audio) / sr # 获取音频时长，假设采样率为44100
+
+            if audio_duration < shortest_duration:
+                shortest_audio = audio
+                shortest_duration = audio_duration
+        # -------zyc音频文件写入临时目录。
+        # -------zyc。
         audio_opt.append(audio)
         audio_opt.append(zero_wav)
         t4 = ttime()
