@@ -125,6 +125,7 @@
   "一键三连中途报错": "An error has occured during One-click formatting",
   "一键三连进程结束": "Finished one-click formatting",
   "中文": "Chinese",
+  "片段重复数量": "Number of repeated fragments",
   "凑50字一切": "Cut per 50 characters",
   "凑五句一切": "Cut per 5 sentences",
   "切分后文本": "Text after sliced",
