@@ -613,8 +613,8 @@ with gr.Blocks(title="GPT-SoVITS WebUI") as app:
             )
         gr.Markdown(value=i18n("*请填写需要合成的目标文本和语种模式"))
         with gr.Row():
+            text = gr.Textbox(label=i18n("需要合成的文本"), value="")
             with gr.Column():
-                text = gr.Textbox(label=i18n("需要合成的文本"), value="")
                 text_language = gr.Dropdown(
                     label=i18n("需要合成的语种"), choices=[i18n("中文"), i18n("英文"), i18n("日文"), i18n("中英混合"), i18n("日英混合"), i18n("多语种混合")], value=i18n("中文")
                 )
