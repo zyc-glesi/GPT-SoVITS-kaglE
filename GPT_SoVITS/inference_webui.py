@@ -54,6 +54,7 @@ import gradio as gr
 from transformers import AutoModelForMaskedLM, AutoTokenizer
 import numpy as np
 import librosa
+import string
 from feature_extractor import cnhubert
 
 cnhubert.cnhubert_base_path = cnhubert_base_path
@@ -612,10 +613,13 @@ with gr.Blocks(title="GPT-SoVITS WebUI") as app:
             )
         gr.Markdown(value=i18n("*请填写需要合成的目标文本和语种模式"))
         with gr.Row():
-            text = gr.Textbox(label=i18n("需要合成的文本"), value="")
-            text_language = gr.Dropdown(
-                label=i18n("需要合成的语种"), choices=[i18n("中文"), i18n("英文"), i18n("日文"), i18n("中英混合"), i18n("日英混合"), i18n("多语种混合")], value=i18n("中文")
-            )
+            with gr.Column():
+                text = gr.Textbox(label=i18n("需要合成的文本"), value="")
+                text_language = gr.Dropdown(
+                    label=i18n("需要合成的语种"), choices=[i18n("中文"), i18n("英文"), i18n("日文"), i18n("中英混合"), i18n("日英混合"), i18n("多语种混合")], value=i18n("中文")
+                )
+                gr.Markdown(value=i18n("片段重复数"))
+                reapt_count = gr.Slider(minimum=1, maximum=10, step=1, label=i18n("reapt_count"), value=3, interactive=True)
             how_to_cut = gr.Radio(
                 label=i18n("怎么切"),
                 choices=[i18n("不切"), i18n("凑四句一切"), i18n("凑50字一切"), i18n("按中文句号。切"), i18n("按英文句号.切"), i18n("按标点符号切"), ],
