@@ -397,19 +397,51 @@ def get_tts_wav(ref_wav_path, prompt_text, prompt_language, text, text_language,
         all_phoneme_len = torch.tensor([all_phoneme_ids.shape[-1]]).to(device)
         prompt = prompt_semantic.unsqueeze(0).to(device)
         t2 = ttime()
-        with torch.no_grad():
-            # pred_semantic = t2s_model.model.infer(
-            pred_semantic, idx = t2s_model.model.infer_panel(
-                all_phoneme_ids,
-                all_phoneme_len,
-                None if ref_free else prompt,
-                bert,
-                # prompt_phone_len=ph_offset,
-                top_k=top_k,
-                top_p=top_p,
-                temperature=temperature,
-                early_stop_num=hz * max_sec,
-            )
+        # ----zyc 循环3次，取最小值的语义表示
+        min_second_dimension_size = float('inf')
+        min_pred_semantic = None
+
+        for _ in range(3):
+            with torch.no_grad():
+                pred_semantic, idx = t2s_model.model.infer_panel(
+                    all_phoneme_ids,
+                    all_phoneme_len,
+                    None if ref_free else prompt,
+                    bert,
+                    top_k=top_k,
+                    top_p=top_p,
+                    temperature=temperature,
+                    early_stop_num=hz * max_sec,
+                )
+
+            # The size of the second dimension for the current pred_semantic
+            second_dimension_size = pred_semantic.shape[1]
+
+            # If this is the smallest second_dimension_size so far, update min variables
+            if second_dimension_size < min_second_dimension_size:
+                min_second_dimension_size = second_dimension_size
+                min_pred_semantic = pred_semantic
+
+        pred_semantic = min_pred_semantic
+        # ----zyc 循环3次，取最小值的语义表示
+
+
+        # with torch.no_grad():
+        #     # pred_semantic = t2s_model.model.infer(
+        #     pred_semantic, idx = t2s_model.model.infer_panel(
+        #         all_phoneme_ids,
+        #         all_phoneme_len,
+        #         None if ref_free else prompt,
+        #         bert,
+        #         # prompt_phone_len=ph_offset,
+        #         top_k=top_k,
+        #         top_p=top_p,
+        #         temperature=temperature,
+        #         early_stop_num=hz * max_sec,
+        #     )
+        # # 声明一个比较用的变量
+        # second_dimension_size = pred_semantic.shape[1]
+
         t3 = ttime()
         print(pred_semantic.shape,idx) #-----zyc试一下打印出来的都是什么。
         pred_semantic = pred_semantic[:, -idx:].unsqueeze(
