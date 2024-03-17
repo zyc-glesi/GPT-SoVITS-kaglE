@@ -84,6 +84,12 @@ else:
     bert_model = bert_model.to(device)
 
 
+def get_first_five_letters(text):
+    # 移除所有标点符号
+    clean_text = ''.join(char for char in text if char not in string.punctuation)
+    # 返回前5个字符，如果不足5个，则返回所有字符
+    return clean_text[:5]
+
 def get_bert_feature(text, word2ph):
     with torch.no_grad():
         inputs = tokenizer(text, return_tensors="pt")
@@ -374,8 +380,9 @@ def get_tts_wav(ref_wav_path, prompt_text, prompt_language, text, text_language,
     #zyc 生成一个用于存放音频的文件夹
     import soundfile as sf
     # --------- zyc 生成一个用于存放音频片段的文件夹，每次运行生成一个
-    current_time = ttime()
-    temp_audio_path = f'/kaggle/working/GPT-SoVITS/TEMP_AUDIO/{current_time}'
+    current_time = int(ttime())
+    five_words = get_first_five_letters(texts)
+    temp_audio_path = f'/kaggle/working/GPT-SoVITS/TEMP_AUDIO/{current_time}_{five_words}'
     os.makedirs(temp_audio_path, exist_ok=True)
     # --------- zyc 生成一个用于存放音频的文件夹，每次运行生成一个
     for text in texts:
@@ -400,12 +407,13 @@ def get_tts_wav(ref_wav_path, prompt_text, prompt_language, text, text_language,
         # ----zyc 循环3次，取最小值的语义表示
         # ----这个位置循环3次取最小值，也没多少有意义，依然可能出现幻觉。我不知道，看起来这个地方汇聚了全部参数，应该是语义生成的地方。但是依然如此。难道决定性的因素在更前方？
         # ----想要知道是不是这里的问题，我需要输出每一次的音频，且将数字扩大到6次。
+        # ----经过验证，确实是这个地方出现了问题，现在就是一个概率问题了。3次音频片段保存下来。如果出现错误。尝试人工寻找备份方案替换，但是啊。推理工作时间翻了3倍。
         min_second_dimension_size = float('inf')
         min_pred_semantic = None
         shortest_audio = None
         shortest_duration = float('inf')
 
-        for _ in range(6):
+        for zyci in range(3):
             with torch.no_grad():
                 pred_semantic, idx = t2s_model.model.infer_panel(
                     all_phoneme_ids,
@@ -417,6 +425,7 @@ def get_tts_wav(ref_wav_path, prompt_text, prompt_language, text, text_language,
                     temperature=temperature,
                     early_stop_num=hz * max_sec,
                 )
+            second_dimension_size = pred_semantic.shape[1]
             t3 = ttime()
             print(pred_semantic.shape,idx) #-----zyc试一下打印出来的都是什么。
             pred_semantic = pred_semantic[:, -idx:].unsqueeze(
@@ -439,8 +448,9 @@ def get_tts_wav(ref_wav_path, prompt_text, prompt_language, text, text_language,
             max_audio = np.abs(audio).max()  # 简单防止16bit爆音
             if max_audio > 1: audio /= max_audio
             # -------zyc音频文件，根据当前时间写入临时目录。
-            current_time = ttime()
-            audio_path = os.path.join(temp_audio_path, f"{current_time}.wav")
+            current_time = int(ttime())
+            five_words = get_first_five_letters(text)
+            audio_path = os.path.join(temp_audio_path, f"{current_time}_{second_dimension_size}_{five_words}_{zyci}.wav")
             sf.write(audio_path, audio, 32000)
             # -------zyc音频文件，根据当前时间写入临时目录。
             # -------zyc-----比较三次的音频，给最短的给到下面的程序-----start。
