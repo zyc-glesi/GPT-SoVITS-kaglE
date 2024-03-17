@@ -373,12 +373,12 @@ def get_tts_wav(ref_wav_path, prompt_text, prompt_language, text, text_language,
 
     #zyc 生成一个用于存放音频的文件夹
     import soundfile as sf
+    # --------- zyc 生成一个用于存放音频片段的文件夹，每次运行生成一个
+    current_time = ttime()
+    temp_audio_path = f'/kaggle/working/GPT-SoVITS/TEMP_AUDIO/{current_time}'
+    os.makedirs(temp_audio_path, exist_ok=True)
+    # --------- zyc 生成一个用于存放音频的文件夹，每次运行生成一个
     for text in texts:
-        #--------- zyc 生成一个用于存放音频的文件夹
-        current_time = ttime()
-        temp_audio_path = f'/kaggle/working/GPT-SoVITS/TEMP_AUDIO/{current_time}'
-        os.makedirs(temp_audio_path, exist_ok=True)
-        #--------- zyc 生成一个用于存放音频的文件夹
         # 解决输入目标文本的空行导致报错的问题
         if (len(text.strip()) == 0):
             continue
@@ -411,7 +411,7 @@ def get_tts_wav(ref_wav_path, prompt_text, prompt_language, text, text_language,
                 early_stop_num=hz * max_sec,
             )
         t3 = ttime()
-        # print(pred_semantic.shape,idx)
+        print(pred_semantic.shape,idx) #-----zyc试一下打印出来的都是什么。
         pred_semantic = pred_semantic[:, -idx:].unsqueeze(
             0
         )  # .unsqueeze(0)#mq要多unsqueeze一次
@@ -422,35 +422,24 @@ def get_tts_wav(ref_wav_path, prompt_text, prompt_language, text, text_language,
             refer = refer.to(device)
         # audio = vq_model.decode(pred_semantic, all_phoneme_ids, refer).detach().cpu().numpy()[0, 0]
         # -------zyc对以下代码进行修改，尝试多次，取最小值，这会成本增加音频的处理时间。
-        shortest_audio = None
-        shortest_duration = float('inf')
-
-        for _ in range(3):  # 生成3个音频
-            audio = (
-                vq_model.decode(
-                    pred_semantic, torch.LongTensor(phones2).to(device).unsqueeze(0), refer
-                )
-                .detach()
-                .cpu()
-                .numpy()[0, 0]
-            )  ###试试重建不带上prompt部分
-            # -------zyc音频文件，根据当前时间写入临时目录。
-            max_audio = np.abs(audio).max()  # 简单防止16bit爆音
-            if max_audio > 1: audio /= max_audio
-            current_time = ttime()
-            audio_path = os.path.join(temp_audio_path, f"{current_time}.wav")
-            sf.write(audio_path, audio, 32000)
-            # -------zyc
-            # 加载音频文件
-            wavaudio, sr = librosa.load(audio_path, sr=None)
-            audio_duration = len(wavaudio) / sr # 获取音频时长
-
-            if audio_duration < shortest_duration:
-                shortest_audio = audio #这里传递的必须是音频数据，而非文件wavaudio
-                shortest_duration = audio_duration
-        # -------zyc音频文件写入临时目录。
-        # -------zyc。
-        audio=shortest_audio
+        # -------zyc这个方法行不通，出幻觉问题的不在这里，而是语义生成。
+        # -------zyc不过这里也不是完全没有作用，可以改为存储音频片段。
+        audio = (
+            vq_model.decode(
+                pred_semantic, torch.LongTensor(phones2).to(device).unsqueeze(0), refer
+            )
+            .detach()
+            .cpu()
+            .numpy()[0, 0]
+        )  ###试试重建不带上prompt部分
+        max_audio = np.abs(audio).max()  # 简单防止16bit爆音
+        if max_audio > 1: audio /= max_audio
+        # -------zyc音频文件，根据当前时间写入临时目录。
+        current_time = ttime()
+        audio_path = os.path.join(temp_audio_path, f"{current_time}.wav")
+        sf.write(audio_path, audio, 32000)
+        # -------zyc音频文件，根据当前时间写入临时目录。
+        # -------zyc----------end。
         audio_opt.append(audio)
         audio_opt.append(zero_wav)
         t4 = ttime()
