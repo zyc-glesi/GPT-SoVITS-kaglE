@@ -398,10 +398,14 @@ def get_tts_wav(ref_wav_path, prompt_text, prompt_language, text, text_language,
         prompt = prompt_semantic.unsqueeze(0).to(device)
         t2 = ttime()
         # ----zyc 循环3次，取最小值的语义表示
+        # ----这个位置循环3次取最小值，也没多少有意义，依然可能出现幻觉。我不知道，看起来这个地方汇聚了全部参数，应该是语义生成的地方。但是依然如此。难道决定性的因素在更前方？
+        # ----想要知道是不是这里的问题，我需要输出每一次的音频，且将数字扩大到6次。
         min_second_dimension_size = float('inf')
         min_pred_semantic = None
+        shortest_audio = None
+        shortest_duration = float('inf')
 
-        for _ in range(3):
+        for _ in range(6):
             with torch.no_grad():
                 pred_semantic, idx = t2s_model.model.infer_panel(
                     all_phoneme_ids,
@@ -413,65 +417,42 @@ def get_tts_wav(ref_wav_path, prompt_text, prompt_language, text, text_language,
                     temperature=temperature,
                     early_stop_num=hz * max_sec,
                 )
+            t3 = ttime()
+            print(pred_semantic.shape,idx) #-----zyc试一下打印出来的都是什么。
+            pred_semantic = pred_semantic[:, -idx:].unsqueeze(
+                0
+            )  # .unsqueeze(0)#mq要多unsqueeze一次
+            refer = get_spepc(hps, ref_wav_path)  # .to(device)
+            if is_half == True:
+                refer = refer.half().to(device)
+            else:
+                refer = refer.to(device)
+            # audio = vq_model.decode(pred_semantic, all_phoneme_ids, refer).detach().cpu().numpy()[0, 0]
+            audio = (
+                vq_model.decode(
+                    pred_semantic, torch.LongTensor(phones2).to(device).unsqueeze(0), refer
+                )
+                .detach()
+                .cpu()
+                .numpy()[0, 0]
+            )  ###试试重建不带上prompt部分
+            max_audio = np.abs(audio).max()  # 简单防止16bit爆音
+            if max_audio > 1: audio /= max_audio
+            # -------zyc音频文件，根据当前时间写入临时目录。
+            current_time = ttime()
+            audio_path = os.path.join(temp_audio_path, f"{current_time}.wav")
+            sf.write(audio_path, audio, 32000)
+            # -------zyc音频文件，根据当前时间写入临时目录。
+            # -------zyc-----比较三次的音频，给最短的给到下面的程序-----start。
+            # 加载音频文件
+            wavaudio, sr = librosa.load(audio, sr=None)
+            audio_duration = len(wavaudio) / sr  # 获取音频时长，假设采样率为44100
 
-            # The size of the second dimension for the current pred_semantic
-            second_dimension_size = pred_semantic.shape[1]
-
-            # If this is the smallest second_dimension_size so far, update min variables
-            if second_dimension_size < min_second_dimension_size:
-                min_second_dimension_size = second_dimension_size
-                min_pred_semantic = pred_semantic
-
-        pred_semantic = min_pred_semantic
-        # ----zyc 循环3次，取最小值的语义表示
-
-
-        # with torch.no_grad():
-        #     # pred_semantic = t2s_model.model.infer(
-        #     pred_semantic, idx = t2s_model.model.infer_panel(
-        #         all_phoneme_ids,
-        #         all_phoneme_len,
-        #         None if ref_free else prompt,
-        #         bert,
-        #         # prompt_phone_len=ph_offset,
-        #         top_k=top_k,
-        #         top_p=top_p,
-        #         temperature=temperature,
-        #         early_stop_num=hz * max_sec,
-        #     )
-        # # 声明一个比较用的变量
-        # second_dimension_size = pred_semantic.shape[1]
-
-        t3 = ttime()
-        print(pred_semantic.shape,idx) #-----zyc试一下打印出来的都是什么。
-        pred_semantic = pred_semantic[:, -idx:].unsqueeze(
-            0
-        )  # .unsqueeze(0)#mq要多unsqueeze一次
-        refer = get_spepc(hps, ref_wav_path)  # .to(device)
-        if is_half == True:
-            refer = refer.half().to(device)
-        else:
-            refer = refer.to(device)
-        # audio = vq_model.decode(pred_semantic, all_phoneme_ids, refer).detach().cpu().numpy()[0, 0]
-        # -------zyc对以下代码进行修改，尝试多次，取最小值，这会成本增加音频的处理时间。
-        # -------zyc这个方法行不通，出幻觉问题的不在这里，而是语义生成。
-        # -------zyc不过这里也不是完全没有作用，可以改为存储音频片段。
-        audio = (
-            vq_model.decode(
-                pred_semantic, torch.LongTensor(phones2).to(device).unsqueeze(0), refer
-            )
-            .detach()
-            .cpu()
-            .numpy()[0, 0]
-        )  ###试试重建不带上prompt部分
-        max_audio = np.abs(audio).max()  # 简单防止16bit爆音
-        if max_audio > 1: audio /= max_audio
-        # -------zyc音频文件，根据当前时间写入临时目录。
-        current_time = ttime()
-        audio_path = os.path.join(temp_audio_path, f"{current_time}.wav")
-        sf.write(audio_path, audio, 32000)
-        # -------zyc音频文件，根据当前时间写入临时目录。
-        # -------zyc----------end。
+            if audio_duration < shortest_duration:
+                shortest_audio = audio #这里必须是音频数据，而不是文件
+                shortest_duration = audio_duration
+            # -------zyc----------end。
+        audio = shortest_audio
         audio_opt.append(audio)
         audio_opt.append(zero_wav)
         t4 = ttime()
