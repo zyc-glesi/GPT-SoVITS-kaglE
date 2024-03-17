@@ -636,7 +636,7 @@ with gr.Blocks(title="GPT-SoVITS WebUI") as app:
             [output],
         )
 
-        gr.Markdown(value=i18n("文本切分工具。太长的文本合成出来效果不一定好，所以太长建议先切。合成会根据文本的换行分开合成再拼起来。"))
+        gr.Markdown(value=i18n("文本切分工具。太长的文本合成出来效果不一定好，所以太长建议先切。合成会根据文本的换行分开合成再拼起来。长文本可能还需要降低模型的轮数"))
         with gr.Row():
             text_inp = gr.Textbox(label=i18n("需要合成的切分前文本"), value="")
             button1 = gr.Button(i18n("凑四句一切"), variant="primary")
