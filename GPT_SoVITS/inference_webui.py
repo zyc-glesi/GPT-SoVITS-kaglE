@@ -372,11 +372,10 @@ def get_tts_wav(ref_wav_path, prompt_text, prompt_language, text, text_language,
         phones1,bert1,norm_text1=get_phones_and_bert(prompt_text, prompt_language)
 
     #zyc 生成一个用于存放音频的文件夹
-    import time
     import soundfile as sf
     for text in texts:
         #--------- zyc 生成一个用于存放音频的文件夹
-        current_time = time.now()
+        current_time = ttime.time()
         temp_audio_path = f'/kaggle/working/GPT-SoVITS/TEMP_AUDIO/{current_time}'
         os.makedirs(temp_audio_path, exist_ok=True)
         #--------- zyc 生成一个用于存放音频的文件夹
@@ -438,7 +437,7 @@ def get_tts_wav(ref_wav_path, prompt_text, prompt_language, text, text_language,
             # -------zyc音频文件，根据当前时间写入临时目录。
             max_audio = np.abs(audio).max()  # 简单防止16bit爆音
             if max_audio > 1: audio /= max_audio
-            current_time = time.now()
+            current_time = ttime.time()
             audio_path = os.path.join(temp_audio_path, f"{current_time}.wav")
             sf.write(audio_path, audio, 32000)
             # -------zyc
