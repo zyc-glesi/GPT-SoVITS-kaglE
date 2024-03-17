@@ -445,7 +445,7 @@ def get_tts_wav(ref_wav_path, prompt_text, prompt_language, text, text_language,
             # -------zyc音频文件，根据当前时间写入临时目录。
             # -------zyc-----比较三次的音频，给最短的给到下面的程序-----start。
             # 加载音频文件
-            wavaudio, sr = librosa.load(audio, sr=None)
+            wavaudio, sr = librosa.load(audio_path, sr=None)
             audio_duration = len(wavaudio) / sr  # 获取音频时长，假设采样率为44100
 
             if audio_duration < shortest_duration:
