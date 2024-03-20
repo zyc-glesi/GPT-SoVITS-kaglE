@@ -87,8 +87,10 @@ else:
 
 def get_first_five_letters(text):
     # 移除所有标点符号
-    clean_text = ''.join(char for char in text if char not in string.punctuation)
-    # 返回前5个字符，如果不足5个，则返回所有字符
+    punctuations = string.punctuation + '，。！？；：“”‘’（）【】《》—…' + '、・〈〉「」『』【】（）〔〕［］｛｝｟｠｢｣〝〞‵′‶‷＂｀｜〃々～' + '「」『』〔〕〈〉《》【】｛｝〖〗〘〙〚〛（）［］｛｝〔〕〖〗〘〙〚〛（）〔〕〖〗〘〙〚〛（）〔〕〖〗〘〙〚〛（）'
+    clean_text = ''.join(char for char in text if char not in punctuations)
+    # 去除标点后再获取前5个字符，如果不足5个，则返回所有字符
+    clean_text = ''.join(char for char in clean_text if char.isalpha())
     return clean_text[:5]
 
 def get_bert_feature(text, word2ph):
