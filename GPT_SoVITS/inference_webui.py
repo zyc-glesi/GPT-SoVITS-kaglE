@@ -388,7 +388,7 @@ def get_tts_wav(ref_wav_path, prompt_text, prompt_language, text, text_language,
     temp_audio_path = f'/kaggle/working/GPT-SoVITS/TEMP_AUDIO/{current_time}_{five_words}'
     os.makedirs(temp_audio_path, exist_ok=True)
     # --------- zyc 生成一个用于存放音频的文件夹，每次运行生成一个
-    for text in texts:
+    for textnum, text in enumerate(texts):
         # 解决输入目标文本的空行导致报错的问题
         if (len(text.strip()) == 0):
             continue
@@ -416,6 +416,7 @@ def get_tts_wav(ref_wav_path, prompt_text, prompt_language, text, text_language,
         shortest_audio = None
         shortest_duration = float('inf')
         reapt_num = int(reapt_count)
+        #today_timepassed = ttime() - (ttime() - (ttime() % 86400))
 
         for zyci in range(reapt_num):
             with torch.no_grad():
@@ -454,7 +455,7 @@ def get_tts_wav(ref_wav_path, prompt_text, prompt_language, text, text_language,
             # -------zyc音频文件，根据当前时间写入临时目录。
             current_time = int(ttime())
             five_words = get_first_five_letters(text)
-            audio_path = os.path.join(temp_audio_path, f"{current_time}_{second_dimension_size}_{five_words}_{zyci}.wav")
+            audio_path = os.path.join(temp_audio_path, f"{current_time}_{second_dimension_size}_{five_words}-{textnum}_{zyci}.wav")
             sf.write(audio_path, audio, 32000)
             # -------zyc音频文件，根据当前时间写入临时目录。
             # -------zyc-----比较三次的音频，给最短的给到下面的程序-----start。
