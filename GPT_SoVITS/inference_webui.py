@@ -54,7 +54,6 @@ import gradio as gr
 from transformers import AutoModelForMaskedLM, AutoTokenizer
 import numpy as np
 import librosa
-import string
 from feature_extractor import cnhubert
 
 cnhubert.cnhubert_base_path = cnhubert_base_path
@@ -67,6 +66,7 @@ from time import time as ttime
 from module.mel_processing import spectrogram_torch
 from my_utils import load_audio
 from tools.i18n.i18n import I18nAuto
+import string
 
 i18n = I18nAuto()
 
@@ -83,7 +83,6 @@ if is_half == True:
     bert_model = bert_model.half().to(device)
 else:
     bert_model = bert_model.to(device)
-
 
 def get_first_five_letters(text):
     # 移除所有标点符号
@@ -380,7 +379,7 @@ def get_tts_wav(ref_wav_path, prompt_text, prompt_language, text, text_language,
     if not ref_free:
         phones1,bert1,norm_text1=get_phones_and_bert(prompt_text, prompt_language)
 
-    #zyc 生成一个用于存放音频的文件夹
+    # zyc 生成一个用于存放音频的文件夹
     import soundfile as sf
     # --------- zyc 生成一个用于存放音频片段的文件夹，每次运行生成一个
     current_time = int(ttime())
@@ -416,7 +415,7 @@ def get_tts_wav(ref_wav_path, prompt_text, prompt_language, text, text_language,
         shortest_audio = None
         shortest_duration = float('inf')
         reapt_num = int(reapt_count)
-        #today_timepassed = ttime() - (ttime() - (ttime() % 86400))
+        # today_timepassed = ttime() - (ttime() - (ttime() % 86400))
 
         for zyci in range(reapt_num):
             with torch.no_grad():
@@ -432,7 +431,7 @@ def get_tts_wav(ref_wav_path, prompt_text, prompt_language, text, text_language,
                 )
             second_dimension_size = pred_semantic.shape[1]
             t3 = ttime()
-            print(pred_semantic.shape,idx) #-----zyc试一下打印出来的都是什么。
+            print(pred_semantic.shape, idx)  # -----zyc试一下打印出来的都是什么。
             pred_semantic = pred_semantic[:, -idx:].unsqueeze(
                 0
             )  # .unsqueeze(0)#mq要多unsqueeze一次
@@ -455,7 +454,8 @@ def get_tts_wav(ref_wav_path, prompt_text, prompt_language, text, text_language,
             # -------zyc音频文件，根据当前时间写入临时目录。
             current_time = int(ttime())
             five_words = get_first_five_letters(text)
-            audio_path = os.path.join(temp_audio_path, f"{current_time}_{second_dimension_size}_{five_words}-{textnum}_{zyci}.wav")
+            audio_path = os.path.join(temp_audio_path,
+                                      f"{current_time}_{second_dimension_size}_{five_words}-{textnum}_{zyci}.wav")
             sf.write(audio_path, audio, 32000)
             # -------zyc音频文件，根据当前时间写入临时目录。
             # -------zyc-----比较三次的音频，给最短的给到下面的程序-----start。
@@ -464,7 +464,7 @@ def get_tts_wav(ref_wav_path, prompt_text, prompt_language, text, text_language,
             audio_duration = len(wavaudio) / sr  # 获取音频时长，假设采样率为44100
 
             if audio_duration < shortest_duration:
-                shortest_audio = audio #这里必须是音频数据，而不是文件
+                shortest_audio = audio  # 这里必须是音频数据，而不是文件
                 shortest_duration = audio_duration
             # -------zyc----------end。
         audio = shortest_audio
@@ -618,12 +618,18 @@ with gr.Blocks(title="GPT-SoVITS WebUI") as app:
         gr.Markdown(value=i18n("*请填写需要合成的目标文本和语种模式"))
         with gr.Row():
             text = gr.Textbox(label=i18n("需要合成的文本"), value="")
+            # -------zyc--------
             with gr.Column():
                 text_language = gr.Dropdown(
-                    label=i18n("需要合成的语种"), choices=[i18n("中文"), i18n("英文"), i18n("日文"), i18n("中英混合"), i18n("日英混合"), i18n("多语种混合")], value=i18n("中文")
+                    label=i18n("需要合成的语种"),
+                    choices=[i18n("中文"), i18n("英文"), i18n("日文"), i18n("中英混合"), i18n("日英混合"),
+                             i18n("多语种混合")], value=i18n("中文")
                 )
+                # -------zyc--------
                 gr.Markdown(value=i18n("片段重复数"))
-                reapt_count = gr.Slider(minimum=1, maximum=10, step=1, label=i18n("reapt_count"), value=3, interactive=True)
+                reapt_count = gr.Slider(minimum=1, maximum=10, step=1, label=i18n("reapt_count"), value=3,
+                                        interactive=True)
+                # -------zyc--------
             how_to_cut = gr.Radio(
                 label=i18n("怎么切"),
                 choices=[i18n("不切"), i18n("凑四句一切"), i18n("凑50字一切"), i18n("按中文句号。切"), i18n("按英文句号.切"), i18n("按标点符号切"), ],
@@ -640,11 +646,11 @@ with gr.Blocks(title="GPT-SoVITS WebUI") as app:
 
         inference_button.click(
             get_tts_wav,
-            [inp_ref, prompt_text, prompt_language, text, text_language, how_to_cut, top_k, top_p, temperature, ref_text_free, reapt_count],
+            [inp_ref, prompt_text, prompt_language, text, text_language, how_to_cut, top_k, top_p, temperature, ref_text_free],
             [output],
         )
 
-        gr.Markdown(value=i18n("文本切分工具。太长的文本合成出来效果不一定好，所以太长建议先切。合成会根据文本的换行分开合成再拼起来。长文本可能还需要降低模型的轮数"))
+        gr.Markdown(value=i18n("文本切分工具。太长的文本合成出来效果不一定好，所以太长建议先切。合成会根据文本的换行分开合成再拼起来。"))
         with gr.Row():
             text_inp = gr.Textbox(label=i18n("需要合成的切分前文本"), value="")
             button1 = gr.Button(i18n("凑四句一切"), variant="primary")
