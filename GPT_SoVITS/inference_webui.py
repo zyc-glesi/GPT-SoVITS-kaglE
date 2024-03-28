@@ -646,7 +646,7 @@ with gr.Blocks(title="GPT-SoVITS WebUI") as app:
 
         inference_button.click(
             get_tts_wav,
-            [inp_ref, prompt_text, prompt_language, text, text_language, how_to_cut, top_k, top_p, temperature, ref_text_free],
+            [inp_ref, prompt_text, prompt_language, text, text_language, how_to_cut, top_k, top_p, temperature, ref_text_free, reapt_count],
             [output],
         )
 
