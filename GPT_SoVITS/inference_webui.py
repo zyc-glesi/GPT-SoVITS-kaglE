@@ -66,7 +66,6 @@ from time import time as ttime
 from module.mel_processing import spectrogram_torch
 from my_utils import load_audio
 from tools.i18n.i18n import I18nAuto
-import string
 
 i18n = I18nAuto()
 
@@ -84,13 +83,6 @@ if is_half == True:
 else:
     bert_model = bert_model.to(device)
 
-def get_first_five_letters(text):
-    # 移除所有标点符号
-    punctuations = string.punctuation + '，。！？；：“”‘’（）【】《》—…' + '、・〈〉「」『』【】（）〔〕［］｛｝｟｠｢｣〝〞‵′‶‷＂｀｜〃々～' + '「」『』〔〕〈〉《》【】｛｝〖〗〘〙〚〛（）［］｛｝〔〕〖〗〘〙〚〛（）〔〕〖〗〘〙〚〛（）〔〕〖〗〘〙〚〛（）'
-    clean_text = ''.join(char for char in text if char not in punctuations)
-    # 去除标点后再获取前5个字符，如果不足5个，则返回所有字符
-    clean_text = ''.join(char for char in clean_text if char.isalpha())
-    return clean_text[:5]
 
 def get_bert_feature(text, word2ph):
     with torch.no_grad():
@@ -319,7 +311,7 @@ def merge_short_text_in_array(texts, threshold):
             result[len(result) - 1] += text
     return result
 
-def get_tts_wav(ref_wav_path, prompt_text, prompt_language, text, text_language, how_to_cut=i18n("不切"), top_k=20, top_p=0.6, temperature=0.6, ref_free = False, reapt_count=1):
+def get_tts_wav(ref_wav_path, prompt_text, prompt_language, text, text_language, how_to_cut=i18n("不切"), top_k=20, top_p=0.6, temperature=0.6, ref_free = False):
     if prompt_text is None or len(prompt_text) == 0:
         ref_free = True
     t0 = ttime()
@@ -379,15 +371,7 @@ def get_tts_wav(ref_wav_path, prompt_text, prompt_language, text, text_language,
     if not ref_free:
         phones1,bert1,norm_text1=get_phones_and_bert(prompt_text, prompt_language)
 
-    # zyc 生成一个用于存放音频的文件夹
-    import soundfile as sf
-    # --------- zyc 生成一个用于存放音频片段的文件夹，每次运行生成一个
-    current_time = int(ttime())
-    five_words = get_first_five_letters(texts)
-    temp_audio_path = f'/kaggle/working/GPT-SoVITS/TEMP_AUDIO/{current_time}_{five_words}'
-    os.makedirs(temp_audio_path, exist_ok=True)
-    # --------- zyc 生成一个用于存放音频的文件夹，每次运行生成一个
-    for textnum, text in enumerate(texts):
+    for text in texts:
         # 解决输入目标文本的空行导致报错的问题
         if (len(text.strip()) == 0):
             continue
@@ -406,68 +390,40 @@ def get_tts_wav(ref_wav_path, prompt_text, prompt_language, text, text_language,
         all_phoneme_len = torch.tensor([all_phoneme_ids.shape[-1]]).to(device)
         prompt = prompt_semantic.unsqueeze(0).to(device)
         t2 = ttime()
-        # ----zyc 循环3次，取最小值的语义表示
-        # ----这个位置循环3次取最小值，也没多少有意义，依然可能出现幻觉。我不知道，看起来这个地方汇聚了全部参数，应该是语义生成的地方。但是依然如此。难道决定性的因素在更前方？
-        # ----想要知道是不是这里的问题，我需要输出每一次的音频，且将数字扩大到6次。
-        # ----经过验证，确实是这个地方出现了问题，现在就是一个概率问题了。3次音频片段保存下来。如果出现错误。尝试人工寻找备份方案替换，但是啊。推理工作时间翻了3倍。
-        min_second_dimension_size = float('inf')
-        min_pred_semantic = None
-        shortest_audio = None
-        shortest_duration = float('inf')
-        reapt_num = int(reapt_count)
-        # today_timepassed = ttime() - (ttime() - (ttime() % 86400))
-
-        for zyci in range(reapt_num):
-            with torch.no_grad():
-                pred_semantic, idx = t2s_model.model.infer_panel(
-                    all_phoneme_ids,
-                    all_phoneme_len,
-                    None if ref_free else prompt,
-                    bert,
-                    top_k=top_k,
-                    top_p=top_p,
-                    temperature=temperature,
-                    early_stop_num=hz * max_sec,
-                )
-            second_dimension_size = pred_semantic.shape[1]
-            t3 = ttime()
-            print(pred_semantic.shape, idx)  # -----zyc试一下打印出来的都是什么。
-            pred_semantic = pred_semantic[:, -idx:].unsqueeze(
-                0
-            )  # .unsqueeze(0)#mq要多unsqueeze一次
-            refer = get_spepc(hps, ref_wav_path)  # .to(device)
-            if is_half == True:
-                refer = refer.half().to(device)
-            else:
-                refer = refer.to(device)
-            # audio = vq_model.decode(pred_semantic, all_phoneme_ids, refer).detach().cpu().numpy()[0, 0]
-            audio = (
-                vq_model.decode(
-                    pred_semantic, torch.LongTensor(phones2).to(device).unsqueeze(0), refer
-                )
+        with torch.no_grad():
+            # pred_semantic = t2s_model.model.infer(
+            pred_semantic, idx = t2s_model.model.infer_panel(
+                all_phoneme_ids,
+                all_phoneme_len,
+                None if ref_free else prompt,
+                bert,
+                # prompt_phone_len=ph_offset,
+                top_k=top_k,
+                top_p=top_p,
+                temperature=temperature,
+                early_stop_num=hz * max_sec,
+            )
+        t3 = ttime()
+        # print(pred_semantic.shape,idx)
+        pred_semantic = pred_semantic[:, -idx:].unsqueeze(
+            0
+        )  # .unsqueeze(0)#mq要多unsqueeze一次
+        refer = get_spepc(hps, ref_wav_path)  # .to(device)
+        if is_half == True:
+            refer = refer.half().to(device)
+        else:
+            refer = refer.to(device)
+        # audio = vq_model.decode(pred_semantic, all_phoneme_ids, refer).detach().cpu().numpy()[0, 0]
+        audio = (
+            vq_model.decode(
+                pred_semantic, torch.LongTensor(phones2).to(device).unsqueeze(0), refer
+            )
                 .detach()
                 .cpu()
                 .numpy()[0, 0]
-            )  ###试试重建不带上prompt部分
-            max_audio = np.abs(audio).max()  # 简单防止16bit爆音
-            if max_audio > 1: audio /= max_audio
-            # -------zyc音频文件，根据当前时间写入临时目录。
-            current_time = int(ttime())
-            five_words = get_first_five_letters(text)
-            audio_path = os.path.join(temp_audio_path,
-                                      f"{current_time}_{second_dimension_size}_{five_words}-{textnum}_{zyci}.wav")
-            sf.write(audio_path, audio, 32000)
-            # -------zyc音频文件，根据当前时间写入临时目录。
-            # -------zyc-----比较三次的音频，给最短的给到下面的程序-----start。
-            # 加载音频文件
-            wavaudio, sr = librosa.load(audio_path, sr=None)
-            audio_duration = len(wavaudio) / sr  # 获取音频时长，假设采样率为44100
-
-            if audio_duration < shortest_duration:
-                shortest_audio = audio  # 这里必须是音频数据，而不是文件
-                shortest_duration = audio_duration
-            # -------zyc----------end。
-        audio = shortest_audio
+        )  ###试试重建不带上prompt部分
+        max_audio=np.abs(audio).max()#简单防止16bit爆音
+        if max_audio>1:audio/=max_audio
         audio_opt.append(audio)
         audio_opt.append(zero_wav)
         t4 = ttime()
@@ -574,8 +530,8 @@ def change_choices():
 
 pretrained_sovits_name = "GPT_SoVITS/pretrained_models/s2G488k.pth"
 pretrained_gpt_name = "GPT_SoVITS/pretrained_models/s1bert25hz-2kh-longer-epoch=68e-step=50232.ckpt"
-SoVITS_weight_root = "/kaggle/temp/SoVITS_weights"
-GPT_weight_root = "/kaggle/temp/GPT_weights"
+SoVITS_weight_root = "SoVITS_weights"
+GPT_weight_root = "GPT_weights"
 os.makedirs(SoVITS_weight_root, exist_ok=True)
 os.makedirs(GPT_weight_root, exist_ok=True)
 
@@ -618,18 +574,9 @@ with gr.Blocks(title="GPT-SoVITS WebUI") as app:
         gr.Markdown(value=i18n("*请填写需要合成的目标文本和语种模式"))
         with gr.Row():
             text = gr.Textbox(label=i18n("需要合成的文本"), value="")
-            # -------zyc--------
-            with gr.Column():
-                text_language = gr.Dropdown(
-                    label=i18n("需要合成的语种"),
-                    choices=[i18n("中文"), i18n("英文"), i18n("日文"), i18n("中英混合"), i18n("日英混合"),
-                             i18n("多语种混合")], value=i18n("中文")
-                )
-                # -------zyc--------
-                gr.Markdown(value=i18n("片段重复数"))
-                reapt_count = gr.Slider(minimum=1, maximum=10, step=1, label=i18n("reapt_count"), value=3,
-                                        interactive=True)
-                # -------zyc--------
+            text_language = gr.Dropdown(
+                label=i18n("需要合成的语种"), choices=[i18n("中文"), i18n("英文"), i18n("日文"), i18n("中英混合"), i18n("日英混合"), i18n("多语种混合")], value=i18n("中文")
+            )
             how_to_cut = gr.Radio(
                 label=i18n("怎么切"),
                 choices=[i18n("不切"), i18n("凑四句一切"), i18n("凑50字一切"), i18n("按中文句号。切"), i18n("按英文句号.切"), i18n("按标点符号切"), ],
@@ -646,7 +593,7 @@ with gr.Blocks(title="GPT-SoVITS WebUI") as app:
 
         inference_button.click(
             get_tts_wav,
-            [inp_ref, prompt_text, prompt_language, text, text_language, how_to_cut, top_k, top_p, temperature, ref_text_free, reapt_count],
+            [inp_ref, prompt_text, prompt_language, text, text_language, how_to_cut, top_k, top_p, temperature, ref_text_free],
             [output],
         )
 
