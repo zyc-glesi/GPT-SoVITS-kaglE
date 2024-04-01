@@ -66,6 +66,7 @@ from time import time as ttime
 from module.mel_processing import spectrogram_torch
 from my_utils import load_audio
 from tools.i18n.i18n import I18nAuto
+import string
 
 i18n = I18nAuto()
 
