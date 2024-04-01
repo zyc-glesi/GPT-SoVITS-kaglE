@@ -66,7 +66,6 @@ from time import time as ttime
 from module.mel_processing import spectrogram_torch
 from my_utils import load_audio
 from tools.i18n.i18n import I18nAuto
-import string
 
 i18n = I18nAuto()
 
@@ -83,6 +82,7 @@ if is_half == True:
     bert_model = bert_model.half().to(device)
 else:
     bert_model = bert_model.to(device)
+
 
 def get_first_five_letters(text):
     # 移除所有标点符号
@@ -445,12 +445,12 @@ def get_tts_wav(ref_wav_path, prompt_text, prompt_language, text, text_language,
                 vq_model.decode(
                     pred_semantic, torch.LongTensor(phones2).to(device).unsqueeze(0), refer
                 )
-                .detach()
-                .cpu()
-                .numpy()[0, 0]
+                    .detach()
+                    .cpu()
+                    .numpy()[0, 0]
             )  ###试试重建不带上prompt部分
-            max_audio = np.abs(audio).max()  # 简单防止16bit爆音
-            if max_audio > 1: audio /= max_audio
+            max_audio=np.abs(audio).max()#简单防止16bit爆音
+            if max_audio>1:audio/=max_audio
             # -------zyc音频文件，根据当前时间写入临时目录。
             current_time = int(ttime())
             five_words = get_first_five_letters(text)
@@ -574,8 +574,8 @@ def change_choices():
 
 pretrained_sovits_name = "GPT_SoVITS/pretrained_models/s2G488k.pth"
 pretrained_gpt_name = "GPT_SoVITS/pretrained_models/s1bert25hz-2kh-longer-epoch=68e-step=50232.ckpt"
-SoVITS_weight_root = "/kaggle/temp/SoVITS_weights"
-GPT_weight_root = "/kaggle/temp/GPT_weights"
+SoVITS_weight_root = "SoVITS_weights"
+GPT_weight_root = "GPT_weights"
 os.makedirs(SoVITS_weight_root, exist_ok=True)
 os.makedirs(GPT_weight_root, exist_ok=True)
 
