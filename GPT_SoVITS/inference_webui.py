@@ -457,6 +457,7 @@ def get_tts_wav(ref_wav_path, prompt_text, prompt_language, text, text_language,
             five_words = get_first_five_letters(text)
             audio_path = os.path.join(temp_audio_path,
                                       f"{current_time}_{second_dimension_size}_{five_words}-{textnum}_{zyci}.wav")
+            audio = audio.astype('float32')
             sf.write(audio_path, audio, 32000)
             # -------zyc音频文件，根据当前时间写入临时目录。
             # -------zyc-----比较三次的音频，给最短的给到下面的程序-----start。
