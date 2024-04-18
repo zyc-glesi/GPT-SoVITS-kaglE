@@ -17,6 +17,7 @@ logging.getLogger("charset_normalizer").setLevel(logging.ERROR)
 logging.getLogger("torchaudio._extension").setLevel(logging.ERROR)
 import pdb
 import torch
+import subprocess
 
 if os.path.exists("./gweight.txt"):
     with open("./gweight.txt", 'r', encoding="utf-8") as file:
@@ -457,7 +458,7 @@ def get_tts_wav(ref_wav_path, prompt_text, prompt_language, text, text_language,
             five_words = get_first_five_letters(text)
             audio_path = os.path.join(temp_audio_path,
                                       f"{current_time}_{second_dimension_size}_{five_words}-{textnum}_{zyci}.wav")
-            audio = audio.astype('float32')
+            audio = audio.astype('float32')#简单防止16bit爆音
             sf.write(audio_path, audio, 32000)
             # -------zyc音频文件，根据当前时间写入临时目录。
             # -------zyc-----比较三次的音频，给最短的给到下面的程序-----start。
@@ -473,6 +474,8 @@ def get_tts_wav(ref_wav_path, prompt_text, prompt_language, text, text_language,
         audio_opt.append(audio)
         audio_opt.append(zero_wav)
         t4 = ttime()
+    subprocess.run(['tar', '-czf', f'{temp_audio_path}.tar.gz', '-C', '/kaggle/working/GPT-SoVITS/TEMP_AUDIO/',
+                    f'{os.path.basename(temp_audio_path)}'])
     print("%.3f\t%.3f\t%.3f\t%.3f" % (t1 - t0, t2 - t1, t3 - t2, t4 - t3))
     yield hps.data.sampling_rate, (np.concatenate(audio_opt, 0) * 32768).astype(
         np.int16
